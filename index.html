@@ -13,11 +13,11 @@
       <div>
         <p class="eyebrow">Netzwerk-Werkzeug</p>
         <h1>NAT Rechner</h1>
-        <p class="subtitle">Adressumsetzung, Portweiterleitungen und NAT-Pool-Kapazitaet auf einen Blick.</p>
+        <p class="subtitle">Adressumsetzung, Portweiterleitungen und NAT-Pool-Kapazität auf einen Blick.</p>
       </div>
       <div class="header-actions">
         <button id="theme-toggle" class="icon-button" type="button" title="Dark Mode aktivieren" aria-label="Dark Mode aktivieren" aria-pressed="false">◐</button>
-        <button id="reset" class="icon-button" type="button" title="Eingaben zuruecksetzen" aria-label="Eingaben zuruecksetzen">↺</button>
+        <button id="reset" class="icon-button" type="button" title="Eingaben zurücksetzen" aria-label="Eingaben zurücksetzen">↺</button>
       </div>
     </header>
 
@@ -47,7 +47,7 @@
             <label>
               Inside Global Adresse
               <input id="public-ip" name="public-ip" value="203.0.113.10" autocomplete="off" spellcheck="false" />
-              <small>Oeffentliche Quelladresse</small>
+              <small>Öffentliche Quelladresse</small>
             </label>
             <label>
               Protokoll
@@ -57,7 +57,7 @@
                 <option value="both">TCP und UDP</option>
                 <option value="icmp">ICMP</option>
               </select>
-              <small>Gilt fuer die Portweiterleitung</small>
+              <small>Gilt für die Portweiterleitung</small>
             </label>
             <label>
               Gleichzeitige Verbindungen
@@ -73,7 +73,7 @@
                 <input id="private-host" value="10.20.30.25" autocomplete="off" spellcheck="false" />
               </label>
               <label>
-                Oeffentliche Host-Adresse
+                Öffentliche Host-Adresse
                 <input id="static-public-ip" value="203.0.113.25" autocomplete="off" spellcheck="false" />
               </label>
             </div>
@@ -82,7 +82,7 @@
           <div id="pool-fields" class="mode-fields hidden">
             <div class="form-grid compact-grid">
               <label>
-                Erster Pool-Adresse
+                Erste Pool-Adresse
                 <input id="pool-start" value="203.0.113.32" autocomplete="off" spellcheck="false" />
               </label>
               <label>
@@ -131,14 +131,14 @@
           <div class="panel-heading">
             <div>
               <p class="section-label">Auslastung</p>
-              <h2 id="capacity-title">PAT-Kapazitaet</h2>
+              <h2 id="capacity-title">PAT-Kapazität</h2>
             </div>
           </div>
           <div class="capacity-number"><span id="capacity-value">64.512</span><small id="capacity-unit">TCP/UDP-Ports</small></div>
-          <div class="meter" role="meter" aria-label="Kapazitaetsauslastung" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="meter" role="meter" aria-label="Kapazitätsauslastung" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
             <span id="capacity-meter"></span>
           </div>
-          <p id="capacity-detail" class="capacity-detail">500 erwartete Translations belegen weniger als 1 % einer einzelnen oeffentlichen Adresse.</p>
+          <p id="capacity-detail" class="capacity-detail">500 erwartete Translations belegen weniger als 1 % einer einzelnen öffentlichen Adresse.</p>
         </section>
       </aside>
     </div>
@@ -167,14 +167,14 @@
       <article class="reference-card">
         <p class="section-label">Betriebshinweis</p>
         <h2>Vor dem Rollout</h2>
-        <p>Route, ACL, Inside/Outside-Markierung und Port-Konflikte gegen die Zielplattform pruefen.</p>
+        <p>Route, ACL, Inside/Outside-Markierung und Port-Konflikte gegen die Zielplattform prüfen.</p>
       </article>
     </section>
   </main>
   <template id="forwarding-template">
     <div class="forward-row">
       <select class="forward-protocol" aria-label="Protokoll"><option>TCP</option><option>UDP</option></select>
-      <input class="forward-public-port" type="number" min="1" max="65535" placeholder="Public Port" aria-label="Oeffentlicher Port" />
+      <input class="forward-public-port" type="number" min="1" max="65535" placeholder="Public Port" aria-label="Öffentlicher Port" />
       <span>→</span>
       <input class="forward-private-ip" placeholder="Inside Host" aria-label="Privater Host" />
       <input class="forward-private-port" type="number" min="1" max="65535" placeholder="Inside Port" aria-label="Privater Port" />

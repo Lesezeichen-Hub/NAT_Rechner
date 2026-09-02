@@ -98,17 +98,17 @@ function calculate() {
   const network = parseCIDR(els.insideNetwork.value);
   const publicIP = parseIPv4(els.publicIP.value);
   if (!network) {
-    setValidation("Ungueltiges CIDR-Netz", false);
+    setValidation("Ungültiges CIDR-Netz", false);
     return;
   }
   if (publicIP === null) {
-    setValidation("Ungueltige oeffentliche Adresse", false);
+    setValidation("Ungültige öffentliche Adresse", false);
     return;
   }
   if (!isPrivateIPv4(network.network)) {
     setValidation("Hinweis: kein RFC-1918-Netz", false);
   } else {
-    setValidation("Eingaben gueltig", true);
+    setValidation("Eingaben gültig", true);
   }
 
   const usable = network.prefix >= 31 ? network.addresses : Math.max(0, network.addresses - 2);
@@ -123,35 +123,35 @@ function calculate() {
   const forwards = getForwards();
   const forwardError = forwards.find(forward => !validPort(forward.publicPort) || !validPort(forward.privatePort) || parseIPv4(forward.privateIP) === null);
   if (forwardError) {
-    setValidation("Portweiterleitung unvollstaendig", false);
+    setValidation("Portweiterleitung unvollständig", false);
     return;
   }
 
   let capacity = 64512;
   let capacityLabel = "TCP/UDP-Ports";
-  let capacityTitle = "PAT-Kapazitaet";
-  let detail = "einer einzelnen oeffentlichen Adresse";
+  let capacityTitle = "PAT-Kapazität";
+  let detail = "einer einzelnen öffentlichen Adresse";
   if (state.mode === "static") {
     const privateHost = parseIPv4(els.privateHost.value);
     const staticPublic = parseIPv4(els.staticPublicIP.value);
     if (privateHost === null || staticPublic === null) {
-      setValidation("Statische NAT-Adresse ungueltig", false);
+      setValidation("Statische NAT-Adresse ungültig", false);
       return;
     }
     capacity = 1;
     capacityLabel = "1:1 Zuordnung";
     capacityTitle = "Statisches NAT";
-    detail = "einer festen oeffentlichen Adresse";
+    detail = "einer festen öffentlichen Adresse";
   } else if (state.mode === "pool") {
     const start = parseIPv4(els.poolStart.value);
     const end = parseIPv4(els.poolEnd.value);
     if (start === null || end === null || start > end) {
-      setValidation("NAT-Pool ungueltig", false);
+      setValidation("NAT-Pool ungültig", false);
       return;
     }
     capacity = end - start + 1;
-    capacityLabel = "oeffentliche Adressen";
-    capacityTitle = "Pool-Kapazitaet";
+    capacityLabel = "öffentliche Adressen";
+    capacityTitle = "Pool-Kapazität";
     detail = "des konfigurierten NAT-Pools";
   }
 
@@ -173,7 +173,7 @@ function renderConfig(network, forwards) {
   const insideMask = wildcard(network.mask);
   const publicIP = els.publicIP.value.trim();
   const protocol = els.protocol.value;
-  const lines = ["! NAT-Konfiguration - vor Einsatz Interfaces und ACL pruefen", "ip access-list standard NAT-INSIDE", ` permit ${inside} ${insideMask}`, "!"];
+  const lines = ["! NAT-Konfiguration - vor Einsatz Interfaces und ACL prüfen", "ip access-list standard NAT-INSIDE", ` permit ${inside} ${insideMask}`, "!"];
 
   if (state.mode === "pat") {
     els.configTitle.textContent = "Cisco IOS: PAT";
@@ -226,7 +226,7 @@ async function copyText(text, button) {
     button.textContent = "Kopiert";
     setTimeout(() => { button.textContent = label; }, 1400);
   } catch {
-    setValidation("Kopieren nicht verfuegbar", false);
+    setValidation("Kopieren nicht verfügbar", false);
   }
 }
 
@@ -235,7 +235,7 @@ els.form.querySelectorAll("input, select").forEach(input => input.addEventListen
 els.modeButtons.forEach(button => button.addEventListener("click", () => setMode(button.dataset.mode)));
 document.getElementById("add-forward").addEventListener("click", () => addForwarding());
 document.getElementById("copy-config").addEventListener("click", event => copyText(els.configOutput.textContent, event.currentTarget));
-document.getElementById("copy-summary").addEventListener("click", event => copyText(`NAT-Modus: ${modeLabels[state.mode]}\nInside-Netz: ${els.insideNetwork.value}\nInside Global: ${els.publicIP.value}\nKapazitaet: ${els.capacityValue.textContent} ${els.capacityUnit.textContent}\n${els.capacityDetail.textContent}`, event.currentTarget));
+document.getElementById("copy-summary").addEventListener("click", event => copyText(`NAT-Modus: ${modeLabels[state.mode]}\nInside-Netz: ${els.insideNetwork.value}\nInside Global: ${els.publicIP.value}\nKapazität: ${els.capacityValue.textContent} ${els.capacityUnit.textContent}\n${els.capacityDetail.textContent}`, event.currentTarget));
 document.getElementById("reset").addEventListener("click", () => { els.form.reset(); els.forwardingList.innerHTML = ""; addForwarding({ protocol: "TCP", publicPort: 443, privateIP: "10.20.30.25", privatePort: 443 }); setMode("pat"); });
 els.themeToggle.addEventListener("click", () => {
   const nextTheme = state.theme === "dark" ? "light" : "dark";
