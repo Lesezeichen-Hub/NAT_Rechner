@@ -25,6 +25,10 @@
       <button class="mode-button active" type="button" data-mode="pat" aria-pressed="true">PAT / Overload</button>
       <button class="mode-button" type="button" data-mode="static" aria-pressed="false">Statisches NAT</button>
       <button class="mode-button" type="button" data-mode="pool" aria-pressed="false">Dynamischer Pool</button>
+      <button class="mode-button" type="button" data-mode="cgnat" aria-pressed="false">CGNAT</button>
+      <button class="mode-button" type="button" data-mode="twice" aria-pressed="false">Twice NAT</button>
+      <button class="mode-button" type="button" data-mode="nptv6" aria-pressed="false">NPTv6</button>
+      <button class="mode-button" type="button" data-mode="nat64" aria-pressed="false">NAT64 / DNS64</button>
     </section>
 
     <div class="workspace">
@@ -47,7 +51,7 @@
             <label>
               Inside Global Adresse
               <input id="public-ip" name="public-ip" value="203.0.113.10" autocomplete="off" spellcheck="false" />
-              <small>Öffentliche Quelladresse</small>
+              <small>Öffentliche Quelladresse oder Prefix</small>
             </label>
             <label>
               Protokoll
@@ -92,6 +96,60 @@
             </div>
           </div>
 
+          <div id="cgnat-fields" class="mode-fields hidden">
+            <div class="form-grid compact-grid">
+              <label>
+                CGNAT-Pool
+                <input id="cgnat-pool" value="100.64.0.0/24" autocomplete="off" spellcheck="false" />
+                <small>RFC-6598-Shared-Address-Space</small>
+              </label>
+              <label>
+                Ports pro Abonnent
+                <input id="ports-per-subscriber" type="number" min="64" max="64512" step="64" value="512" />
+                <small>Port-Block-Größe für deterministisches CGNAT</small>
+              </label>
+            </div>
+          </div>
+
+          <div id="twice-fields" class="mode-fields hidden">
+            <div class="form-grid compact-grid">
+              <label>
+                Originales Zielnetz
+                <input id="destination-network" value="10.20.40.0/24" autocomplete="off" spellcheck="false" />
+              </label>
+              <label>
+                Übersetztes Zielnetz
+                <input id="translated-destination-network" value="172.20.40.0/24" autocomplete="off" spellcheck="false" />
+              </label>
+            </div>
+          </div>
+
+          <div id="nptv6-fields" class="mode-fields hidden">
+            <div class="form-grid compact-grid">
+              <label>
+                Internes IPv6-Präfix
+                <input id="ipv6-inside-prefix" value="fd12:3456:789a::/48" autocomplete="off" spellcheck="false" />
+              </label>
+              <label>
+                Externes IPv6-Präfix
+                <input id="ipv6-outside-prefix" value="2001:db8:1200::/48" autocomplete="off" spellcheck="false" />
+              </label>
+            </div>
+          </div>
+
+          <div id="nat64-fields" class="mode-fields hidden">
+            <div class="form-grid compact-grid">
+              <label>
+                NAT64-Präfix
+                <input id="nat64-prefix" value="64:ff9b::/96" autocomplete="off" spellcheck="false" />
+              </label>
+              <label>
+                IPv4-Zieladresse
+                <input id="nat64-ipv4-target" value="198.51.100.42" autocomplete="off" spellcheck="false" />
+              </label>
+            </div>
+          </div>
+
           <div class="forwarding-block">
             <div class="forwarding-heading">
               <div>
@@ -104,7 +162,6 @@
           </div>
 
           <div class="form-actions">
-            <button class="primary-button" type="submit">Berechnung aktualisieren</button>
             <button id="copy-summary" class="secondary-button" type="button">Zusammenfassung kopieren</button>
           </div>
         </form>
@@ -140,6 +197,16 @@
           </div>
           <p id="capacity-detail" class="capacity-detail">500 erwartete Translations belegen weniger als 1 % einer einzelnen öffentlichen Adresse.</p>
         </section>
+
+        <section class="panel result-panel warnings-panel">
+          <div class="panel-heading compact-heading">
+            <div>
+              <p class="section-label">Prüfungen</p>
+              <h2>Validierung</h2>
+            </div>
+          </div>
+          <ul id="validation-list" class="validation-list"></ul>
+        </section>
       </aside>
     </div>
 
@@ -149,9 +216,49 @@
           <p class="section-label">Konfiguration</p>
           <h2 id="config-title">Cisco IOS: PAT</h2>
         </div>
-        <button id="copy-config" class="icon-button" type="button" title="Konfiguration kopieren" aria-label="Konfiguration kopieren">⧉</button>
+        <div class="config-actions">
+          <select id="vendor-profile" aria-label="Konfigurationsprofil">
+            <option value="cisco-ios">Cisco IOS</option>
+            <option value="cisco-asa">Cisco ASA / Firepower</option>
+            <option value="juniper">Juniper Junos</option>
+            <option value="fortigate">Fortinet FortiGate</option>
+            <option value="iptables">Linux iptables</option>
+            <option value="nftables">Linux nftables</option>
+          </select>
+          <button id="copy-config" class="icon-button" type="button" title="Konfiguration kopieren" aria-label="Konfiguration kopieren">⧉</button>
+        </div>
       </div>
       <pre id="config-output" class="config-output"></pre>
+    </section>
+
+    <section class="flow-panel" aria-labelledby="flow-title">
+      <div class="flow-heading">
+        <div>
+          <p class="section-label">Paketfluss</p>
+          <h2 id="flow-title">Vor und nach NAT</h2>
+        </div>
+      </div>
+      <div class="flow-diagram">
+        <div class="flow-node"><span>Vor NAT</span><strong id="flow-before-source">10.20.30.25:443</strong><small>Quelle</small><strong id="flow-before-destination">10.20.40.10:443</strong><small>Ziel</small></div>
+        <div class="flow-arrow" aria-hidden="true">→<small id="flow-type">SNAT</small></div>
+        <div class="flow-node after"><span>Nach NAT</span><strong id="flow-after-source">203.0.113.10:443</strong><small>Quelle</small><strong id="flow-after-destination">10.20.40.10:443</strong><small>Ziel</small></div>
+      </div>
+    </section>
+
+    <section class="panel saved-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="section-label">Arbeitsbereich</p>
+          <h2>Vorlagen und Datenaustausch</h2>
+        </div>
+        <div class="config-actions">
+          <button id="save-preset" class="secondary-button" type="button">Vorlage speichern</button>
+          <button id="export-data" class="secondary-button" type="button">Export JSON</button>
+          <label class="secondary-button file-button">Import<input id="import-data" type="file" accept="application/json,.json,.csv,text/csv" /></label>
+        </div>
+      </div>
+      <div id="preset-list" class="preset-list"></div>
+      <p id="transfer-status" class="transfer-status"></p>
     </section>
 
     <section class="reference-grid">

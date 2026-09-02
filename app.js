@@ -1,4 +1,9 @@
-const state = { mode: "pat", theme: localStorage.getItem("nat-rechner-theme") || "light" };
+const state = {
+  mode: "pat",
+  theme: localStorage.getItem("nat-rechner-theme") || "light",
+  vendor: "cisco-ios",
+  bulkRules: [],
+};
 
 const els = {
   form: document.getElementById("nat-form"),
@@ -30,9 +35,39 @@ const els = {
   configTitle: document.getElementById("config-title"),
   configOutput: document.getElementById("config-output"),
   themeToggle: document.getElementById("theme-toggle"),
+  cgnatFields: document.getElementById("cgnat-fields"),
+  twiceFields: document.getElementById("twice-fields"),
+  nptv6Fields: document.getElementById("nptv6-fields"),
+  nat64Fields: document.getElementById("nat64-fields"),
+  cgnatPool: document.getElementById("cgnat-pool"),
+  portsPerSubscriber: document.getElementById("ports-per-subscriber"),
+  destinationNetwork: document.getElementById("destination-network"),
+  translatedDestinationNetwork: document.getElementById("translated-destination-network"),
+  ipv6InsidePrefix: document.getElementById("ipv6-inside-prefix"),
+  ipv6OutsidePrefix: document.getElementById("ipv6-outside-prefix"),
+  nat64Prefix: document.getElementById("nat64-prefix"),
+  nat64IPv4Target: document.getElementById("nat64-ipv4-target"),
+  validationList: document.getElementById("validation-list"),
+  vendorProfile: document.getElementById("vendor-profile"),
+  flowBeforeSource: document.getElementById("flow-before-source"),
+  flowBeforeDestination: document.getElementById("flow-before-destination"),
+  flowAfterSource: document.getElementById("flow-after-source"),
+  flowAfterDestination: document.getElementById("flow-after-destination"),
+  flowType: document.getElementById("flow-type"),
+  presetList: document.getElementById("preset-list"),
+  transferStatus: document.getElementById("transfer-status"),
+  importData: document.getElementById("import-data"),
 };
 
-const modeLabels = { pat: "Port Address Translation", static: "1:1 Address Translation", pool: "Dynamischer NAT-Pool" };
+const modeLabels = {
+  pat: "Port Address Translation",
+  static: "1:1 Address Translation",
+  pool: "Dynamischer NAT-Pool",
+  cgnat: "Carrier-Grade NAT",
+  twice: "Bidirektionales Twice NAT",
+  nptv6: "IPv6 Prefix Translation",
+  nat64: "IPv6 zu IPv4 Übersetzung",
+};
 
 function parseIPv4(value) {
   const parts = String(value).trim().split(".");
@@ -94,22 +129,71 @@ function getForwards() {
 
 function validPort(port) { return Number.isInteger(port) && port >= 1 && port <= 65535; }
 
+function isSpecialIPv4(ip) {
+  if (ip >= 0xe0000000 && ip <= 0xefffffff) return "Multicast-Adressen dürfen nicht für NAT verwendet werden.";
+  if (ip >= 0x7f000000 && ip <= 0x7fffffff) return "Loopback-Adressen dürfen nicht für NAT verwendet werden.";
+  if ((ip >= 0xc0000200 && ip <= 0xc00002ff) || (ip >= 0xc6336400 && ip <= 0xc63364ff) || (ip >= 0xcb007100 && ip <= 0xcb0071ff)) return "Dokumentationsnetz erkannt: nur für Labor und Beispiele verwenden.";
+  if (ip === 0 || ip === 0xffffffff) return "Diese IPv4-Sonderadresse ist nicht routbar.";
+  return "";
+}
+
+function parseIPv6Prefix(value) {
+  const [address, rawPrefix] = String(value).trim().split("/");
+  const prefix = Number(rawPrefix);
+  if (!address || !address.includes(":") || !Number.isInteger(prefix) || prefix < 0 || prefix > 128) return null;
+  return { address: address.toLowerCase(), prefix };
+}
+
+function networksOverlap(first, second) {
+  return first && second && first.network <= second.broadcast && second.network <= first.broadcast;
+}
+
+function renderValidations(items) {
+  els.validationList.innerHTML = "";
+  for (const item of items) {
+    const node = document.createElement("li");
+    node.className = item.level || "info";
+    node.textContent = item.text;
+    els.validationList.appendChild(node);
+  }
+}
+
+function updateFlow(network, forwards) {
+  const source = state.mode === "nptv6" ? els.ipv6InsidePrefix.value.trim() : state.mode === "nat64" ? els.nat64Prefix.value.trim() : `${formatIPv4(network.network + 1)}:49152`;
+  const target = state.mode === "nat64" ? els.nat64IPv4Target.value.trim() : state.mode === "twice" ? `${els.destinationNetwork.value.trim()}` : forwards[0] ? `${forwards[0].privateIP}:${forwards[0].privatePort}` : "198.51.100.42:443";
+  let afterSource = els.publicIP.value.trim();
+  let afterTarget = target;
+  let flowType = "SNAT";
+  if (state.mode === "static") afterSource = els.staticPublicIP.value.trim();
+  if (state.mode === "pool") afterSource = `${els.poolStart.value.trim()} (Pool)`;
+  if (state.mode === "cgnat") afterSource = `${els.publicIP.value.trim()}:Portblock`;
+  if (state.mode === "twice") { afterTarget = els.translatedDestinationNetwork.value.trim(); flowType = "SNAT + DNAT"; }
+  if (state.mode === "nptv6") { afterSource = els.ipv6OutsidePrefix.value.trim(); flowType = "NPTv6"; }
+  if (state.mode === "nat64") { afterTarget = els.nat64IPv4Target.value.trim(); flowType = "NAT64"; }
+  els.flowBeforeSource.textContent = source;
+  els.flowBeforeDestination.textContent = target;
+  els.flowAfterSource.textContent = afterSource;
+  els.flowAfterDestination.textContent = afterTarget;
+  els.flowType.textContent = flowType;
+}
+
 function calculate() {
   const network = parseCIDR(els.insideNetwork.value);
   const publicIP = parseIPv4(els.publicIP.value);
-  if (!network) {
-    setValidation("Ungültiges CIDR-Netz", false);
-    return;
+  const notices = [];
+  if (!network) { setValidation("Ungültiges CIDR-Netz", false); renderValidations([{ level: "error", text: "Inside Local muss eine gültige IPv4-CIDR-Angabe sein." }]); return; }
+  if (publicIP === null && !["nptv6", "nat64"].includes(state.mode)) { setValidation("Ungültige öffentliche Adresse", false); renderValidations([{ level: "error", text: "Inside Global muss eine gültige IPv4-Adresse sein." }]); return; }
+  if (!isPrivateIPv4(network.network)) notices.push({ level: "warning", text: "Inside Local liegt nicht im RFC-1918-Privatbereich." });
+  const publicNotice = publicIP === null ? "" : isSpecialIPv4(publicIP);
+  if (publicNotice) notices.push({ level: publicNotice.includes("dürfen") ? "error" : "warning", text: publicNotice });
+  if (publicIP !== null && isPrivateIPv4(publicIP)) notices.push({ level: "warning", text: "Inside Global ist privat und nicht direkt internet-routbar." });
+
+  const forwards = getForwards();
+  if (forwards.some(forward => !validPort(forward.publicPort) || !validPort(forward.privatePort) || parseIPv4(forward.privateIP) === null)) {
+    setValidation("Portweiterleitung unvollständig", false); renderValidations([{ level: "error", text: "Jede Portweiterleitung benötigt gültige Ports und eine IPv4-Zieladresse." }]); return;
   }
-  if (publicIP === null) {
-    setValidation("Ungültige öffentliche Adresse", false);
-    return;
-  }
-  if (!isPrivateIPv4(network.network)) {
-    setValidation("Hinweis: kein RFC-1918-Netz", false);
-  } else {
-    setValidation("Eingaben gültig", true);
-  }
+  const duplicatePorts = new Set();
+  forwards.forEach(forward => { const key = `${forward.protocol}:${forward.publicPort}`; if (duplicatePorts.has(key)) notices.push({ level: "error", text: `Port-Konflikt: ${key} ist mehrfach belegt.` }); duplicatePorts.add(key); });
 
   const usable = network.prefix >= 31 ? network.addresses : Math.max(0, network.addresses - 2);
   const firstHost = network.prefix >= 31 ? network.network : network.network + 1;
@@ -120,79 +204,86 @@ function calculate() {
   els.usableHosts.textContent = formatNumber(usable);
   els.hostRange.textContent = usable ? `${formatIPv4(firstHost)} - ${formatIPv4(lastHost)}` : "Keine nutzbaren Hosts";
 
-  const forwards = getForwards();
-  const forwardError = forwards.find(forward => !validPort(forward.publicPort) || !validPort(forward.privatePort) || parseIPv4(forward.privateIP) === null);
-  if (forwardError) {
-    setValidation("Portweiterleitung unvollständig", false);
-    return;
-  }
-
-  let capacity = 64512;
-  let capacityLabel = "TCP/UDP-Ports";
-  let capacityTitle = "PAT-Kapazität";
-  let detail = "einer einzelnen öffentlichen Adresse";
+  let capacity = 64512; let capacityLabel = "TCP/UDP-Ports"; let capacityTitle = "PAT-Kapazität"; let detail = "einer einzelnen öffentlichen Adresse";
   if (state.mode === "static") {
-    const privateHost = parseIPv4(els.privateHost.value);
-    const staticPublic = parseIPv4(els.staticPublicIP.value);
-    if (privateHost === null || staticPublic === null) {
-      setValidation("Statische NAT-Adresse ungültig", false);
-      return;
-    }
-    capacity = 1;
-    capacityLabel = "1:1 Zuordnung";
-    capacityTitle = "Statisches NAT";
-    detail = "einer festen öffentlichen Adresse";
+    if (parseIPv4(els.privateHost.value) === null || parseIPv4(els.staticPublicIP.value) === null) { setValidation("Statische NAT-Adresse ungültig", false); return; }
+    capacity = 1; capacityLabel = "1:1 Zuordnung"; capacityTitle = "Statisches NAT"; detail = "einer festen öffentlichen Adresse";
   } else if (state.mode === "pool") {
-    const start = parseIPv4(els.poolStart.value);
-    const end = parseIPv4(els.poolEnd.value);
-    if (start === null || end === null || start > end) {
-      setValidation("NAT-Pool ungültig", false);
-      return;
-    }
-    capacity = end - start + 1;
-    capacityLabel = "öffentliche Adressen";
-    capacityTitle = "Pool-Kapazität";
-    detail = "des konfigurierten NAT-Pools";
+    const start = parseIPv4(els.poolStart.value); const end = parseIPv4(els.poolEnd.value); const pool = start === null || end === null ? null : { network: start, broadcast: end };
+    if (!pool || start > end) { setValidation("NAT-Pool ungültig", false); return; }
+    if (networksOverlap(network, pool)) notices.push({ level: "error", text: "NAT-Pool überlappt mit dem Inside-Local-Netz." });
+    if (isSpecialIPv4(start) || isSpecialIPv4(end)) notices.push({ level: "warning", text: "Der NAT-Pool enthält reservierte oder Dokumentationsadressen." });
+    capacity = end - start + 1; capacityLabel = "öffentliche Adressen"; capacityTitle = "Pool-Kapazität"; detail = "des konfigurierten NAT-Pools";
+  } else if (state.mode === "cgnat") {
+    const pool = parseCIDR(els.cgnatPool.value); const block = Number(els.portsPerSubscriber.value);
+    if (!pool || !validPort(block) || block % 64 !== 0) { setValidation("CGNAT-Pool oder Portblock ungültig", false); return; }
+    if (pool.network < 0x64400000 || pool.broadcast > 0x647fffff) notices.push({ level: "warning", text: "CGNAT-Pool liegt nicht vollständig im RFC-6598-Bereich 100.64.0.0/10." });
+    capacity = Math.floor(64512 / block) * pool.addresses; capacityLabel = "Abonnenten"; capacityTitle = "CGNAT-Kapazität"; detail = `bei ${formatNumber(block)} Ports pro Abonnent`;
+  } else if (state.mode === "twice") {
+    const destination = parseCIDR(els.destinationNetwork.value); const translated = parseCIDR(els.translatedDestinationNetwork.value);
+    if (!destination || !translated || destination.prefix !== translated.prefix) { setValidation("Twice-NAT-Zielnetze ungültig", false); return; }
+    if (networksOverlap(network, translated)) notices.push({ level: "error", text: "Übersetztes Zielnetz überlappt mit dem Inside-Local-Netz." });
+    capacity = usable; capacityLabel = "gleich große Host-Zuordnungen"; capacityTitle = "Twice-NAT-Bereich"; detail = "der symmetrischen Netzübersetzung";
+  } else if (state.mode === "nptv6") {
+    const inside6 = parseIPv6Prefix(els.ipv6InsidePrefix.value); const outside6 = parseIPv6Prefix(els.ipv6OutsidePrefix.value);
+    if (!inside6 || !outside6 || inside6.prefix !== outside6.prefix) { setValidation("NPTv6-Präfixe ungültig", false); return; }
+    if (!inside6.address.startsWith("fd") && !inside6.address.startsWith("fc")) notices.push({ level: "warning", text: "Das interne IPv6-Präfix ist kein ULA-Präfix (fc00::/7)." });
+    capacity = 2 ** Math.min(32, 128 - inside6.prefix); capacityLabel = "IPv6-Hostadressen (angezeigt begrenzt)"; capacityTitle = "NPTv6-Präfix"; detail = `für ${inside6.address}/${inside6.prefix}`;
+  } else if (state.mode === "nat64") {
+    const prefix = parseIPv6Prefix(els.nat64Prefix.value); const target = parseIPv4(els.nat64IPv4Target.value);
+    if (!prefix || prefix.prefix !== 96 || target === null) { setValidation("NAT64-Präfix oder IPv4-Ziel ungültig", false); return; }
+    if (prefix.address !== "64:ff9b::") notices.push({ level: "warning", text: "Es wird nicht das Well-Known NAT64 Prefix 64:ff9b::/96 verwendet." });
+    capacity = 4294967296; capacityLabel = "einbettbare IPv4-Ziele"; capacityTitle = "NAT64 / DNS64"; detail = `unter ${prefix.address}/${prefix.prefix}`;
   }
 
   const connections = Math.max(0, Number(els.connections.value) || 0);
   const utilization = Math.min(100, Math.round((connections / capacity) * 10000) / 100);
-  els.capacityTitle.textContent = capacityTitle;
-  els.capacityValue.textContent = formatNumber(capacity);
-  els.capacityUnit.textContent = capacityLabel;
-  els.capacityMeter.style.width = `${Math.max(utilization, connections ? 1 : 0)}%`;
-  els.capacityMeter.parentElement.setAttribute("aria-valuenow", String(utilization));
+  if (connections > capacity) notices.push({ level: "error", text: "Kapazitätsüberschreitung: erwartete Translations übersteigen die verfügbare Kapazität." });
+  else if (utilization > 80) notices.push({ level: "warning", text: "Hohe Auslastung: Port- oder Pool-Erweiterung einplanen." });
+  if (!notices.length) notices.push({ level: "info", text: "Adressbereiche, Ports und Kapazität sind plausibel." });
+  const hasError = notices.some(item => item.level === "error");
+  setValidation(hasError ? "Prüfung mit Fehlern" : notices.some(item => item.level === "warning") ? "Prüfung mit Hinweisen" : "Eingaben gültig", !hasError);
+  renderValidations(notices);
+  els.capacityTitle.textContent = capacityTitle; els.capacityValue.textContent = formatNumber(capacity); els.capacityUnit.textContent = capacityLabel;
+  els.capacityMeter.style.width = `${Math.max(utilization, connections ? 1 : 0)}%`; els.capacityMeter.parentElement.setAttribute("aria-valuenow", String(utilization));
   els.capacityDetail.textContent = `${formatNumber(connections)} erwartete Translations belegen ${utilization.toLocaleString("de-DE", { maximumFractionDigits: 2 })} % ${detail}.`;
-  renderConfig(network, forwards);
+  updateFlow(network, forwards); renderConfig(network, forwards);
 }
 
 function wildcard(mask) { return formatIPv4((~mask) >>> 0); }
 
 function renderConfig(network, forwards) {
-  const inside = formatIPv4(network.network);
-  const insideMask = wildcard(network.mask);
-  const publicIP = els.publicIP.value.trim();
-  const protocol = els.protocol.value;
-  const lines = ["! NAT-Konfiguration - vor Einsatz Interfaces und ACL prüfen", "ip access-list standard NAT-INSIDE", ` permit ${inside} ${insideMask}`, "!"];
-
-  if (state.mode === "pat") {
-    els.configTitle.textContent = "Cisco IOS: PAT";
-    lines.push(`ip nat inside source list NAT-INSIDE interface <OUTSIDE-INTERFACE> overload`, "!");
-  } else if (state.mode === "static") {
-    els.configTitle.textContent = "Cisco IOS: Statisches NAT";
-    lines.push(`ip nat inside source static ${els.privateHost.value.trim()} ${els.staticPublicIP.value.trim()}`, "!");
+  const inside = formatIPv4(network.network); const outside = els.publicIP.value.trim(); const vendor = els.vendorProfile.value;
+  const targets = forwards.length ? forwards : [{ protocol: "TCP", publicPort: 0, privateIP: `${inside}`, privatePort: 0 }];
+  const title = { "cisco-ios": "Cisco IOS", "cisco-asa": "Cisco ASA / Firepower", juniper: "Juniper Junos", fortigate: "Fortinet FortiGate", iptables: "Linux iptables", nftables: "Linux nftables" }[vendor];
+  const staticSource = state.mode === "static" ? els.privateHost.value.trim() : inside;
+  const staticGlobal = state.mode === "static" ? els.staticPublicIP.value.trim() : outside;
+  let lines = [];
+  if (vendor === "cisco-ios") {
+    lines = ["! NAT-Konfiguration - Interfaces und ACL vor Einsatz prüfen", "ip access-list standard NAT-INSIDE", ` permit ${inside} ${wildcard(network.mask)}`, "!"];
+    if (state.mode === "pat" || state.mode === "cgnat") lines.push("ip nat inside source list NAT-INSIDE interface <OUTSIDE-INTERFACE> overload");
+    if (state.mode === "static") lines.push(`ip nat inside source static ${staticSource} ${staticGlobal}`);
+    if (state.mode === "pool") lines.push(`ip nat pool NAT-POOL ${els.poolStart.value.trim()} ${els.poolEnd.value.trim()} netmask 255.255.255.224`, "ip nat inside source list NAT-INSIDE pool NAT-POOL");
+    if (state.mode === "twice") lines.push(`! SNAT ${inside} -> ${outside}`, `! DNAT ${els.destinationNetwork.value.trim()} -> ${els.translatedDestinationNetwork.value.trim()}`);
+    if (state.mode === "nptv6") lines.push(`! NPTv6 ${els.ipv6InsidePrefix.value.trim()} -> ${els.ipv6OutsidePrefix.value.trim()}`);
+    if (state.mode === "nat64") lines.push(`! NAT64 ${els.nat64Prefix.value.trim()} -> ${els.nat64IPv4Target.value.trim()}`);
+    targets.filter(target => target.publicPort).forEach(target => lines.push(`ip nat inside source static ${target.protocol.toLowerCase()} ${target.privateIP} ${target.privatePort} ${outside} ${target.publicPort}`));
+    lines.push("!", "interface <INSIDE-INTERFACE>", " ip nat inside", "interface <OUTSIDE-INTERFACE>", " ip nat outside");
+  } else if (vendor === "cisco-asa") {
+    lines = [`object network INSIDE-NET`, ` subnet ${inside} ${formatIPv4(network.mask)}`];
+    lines.push(state.mode === "static" ? ` nat (inside,outside) static ${staticGlobal}` : ` nat (inside,outside) dynamic interface`);
+    if (state.mode === "twice") lines.push(`nat (inside,outside) source static INSIDE-NET INSIDE-NET destination static ${els.destinationNetwork.value.trim()} ${els.translatedDestinationNetwork.value.trim()}`);
+  } else if (vendor === "juniper") {
+    lines = ["set security nat source rule-set NAT-RULES from zone trust", "set security nat source rule-set NAT-RULES to zone untrust", `set security nat source rule-set NAT-RULES rule NAT-INSIDE match source-address ${els.insideNetwork.value.trim()}`, `set security nat source rule-set NAT-RULES rule NAT-INSIDE then source-nat interface`];
+  } else if (vendor === "fortigate") {
+    lines = ["config firewall policy", " edit 0", '  set name "NAT-INSIDE"', "  set srcintf \"inside\"", "  set dstintf \"outside\"", `  set srcaddr "${els.insideNetwork.value.trim()}"`, "  set nat enable", " next", "end"];
+  } else if (vendor === "iptables") {
+    lines = [`iptables -t nat -A POSTROUTING -s ${els.insideNetwork.value.trim()} -o <outside-interface> -j MASQUERADE`, ...targets.filter(target => target.publicPort).map(target => `iptables -t nat -A PREROUTING -i <outside-interface> -p ${target.protocol.toLowerCase()} --dport ${target.publicPort} -j DNAT --to-destination ${target.privateIP}:${target.privatePort}`)];
   } else {
-    els.configTitle.textContent = "Cisco IOS: Dynamischer Pool";
-    lines.push(`ip nat pool NAT-POOL ${els.poolStart.value.trim()} ${els.poolEnd.value.trim()} netmask 255.255.255.224`, "ip nat inside source list NAT-INSIDE pool NAT-POOL", "!");
+    lines = ["table ip nat {", " chain postrouting {", "  type nat hook postrouting priority srcnat;", `  ip saddr ${els.insideNetwork.value.trim()} oifname \"<outside-interface>\" masquerade`, " }", "}"];
   }
-
-  for (const forward of forwards) {
-    lines.push(`ip nat inside source static ${forward.protocol.toLowerCase()} ${forward.privateIP} ${forward.privatePort} ${publicIP} ${forward.publicPort}`);
-  }
-  if (forwards.length) lines.push("!");
-  lines.push("interface <INSIDE-INTERFACE>", " ip nat inside", "!", "interface <OUTSIDE-INTERFACE>", " ip nat outside");
-  if (protocol === "icmp") lines.push("! ICMP verwendet keine Portweiterleitungen.");
-  els.configOutput.textContent = lines.join("\n");
+  if (state.bulkRules.length) lines.push("", "! Importierte Bulk-Regeln", ...state.bulkRules);
+  els.configTitle.textContent = `${title}: ${modeLabels[state.mode]}`; els.configOutput.textContent = lines.join("\n");
 }
 
 function setMode(mode) {
@@ -205,6 +296,10 @@ function setMode(mode) {
   els.modeLabel.textContent = modeLabels[mode];
   els.staticFields.classList.toggle("hidden", mode !== "static");
   els.poolFields.classList.toggle("hidden", mode !== "pool");
+  els.cgnatFields.classList.toggle("hidden", mode !== "cgnat");
+  els.twiceFields.classList.toggle("hidden", mode !== "twice");
+  els.nptv6Fields.classList.toggle("hidden", mode !== "nptv6");
+  els.nat64Fields.classList.toggle("hidden", mode !== "nat64");
   calculate();
 }
 
@@ -246,3 +341,81 @@ els.themeToggle.addEventListener("click", () => {
 applyTheme(state.theme);
 addForwarding({ protocol: "TCP", publicPort: 443, privateIP: "10.20.30.25", privatePort: 443 });
 calculate();
+
+function snapshot() {
+  const fields = {};
+  els.form.querySelectorAll("input, select").forEach(field => { if (field.id) fields[field.id] = field.value; });
+  return { name: "", mode: state.mode, vendor: els.vendorProfile.value, fields, forwards: getForwards(), bulkRules: state.bulkRules };
+}
+
+function applySnapshot(data) {
+  if (!data || !data.fields) throw new Error("Unvollständige NAT-Vorlage");
+  Object.entries(data.fields).forEach(([id, value]) => { const field = document.getElementById(id); if (field) field.value = value; });
+  state.bulkRules = Array.isArray(data.bulkRules) ? data.bulkRules : [];
+  els.forwardingList.innerHTML = "";
+  (data.forwards || []).forEach(addForwarding);
+  if (!els.forwardingList.children.length) addForwarding();
+  els.vendorProfile.value = data.vendor || "cisco-ios";
+  setMode(data.mode || "pat");
+}
+
+function presets() {
+  try { const value = JSON.parse(localStorage.getItem("nat-rechner-presets") || "[]"); return Array.isArray(value) ? value : []; } catch { return []; }
+}
+
+function renderPresets() {
+  const stored = presets();
+  els.presetList.innerHTML = "";
+  if (!stored.length) { els.presetList.textContent = "Noch keine lokalen Vorlagen gespeichert."; return; }
+  stored.forEach((preset, index) => {
+    const item = document.createElement("div"); item.className = "preset-item";
+    const load = document.createElement("button"); load.type = "button"; load.className = "preset-load"; load.textContent = preset.name || `Vorlage ${index + 1}`;
+    load.addEventListener("click", () => { applySnapshot(preset); setTransferStatus(`Vorlage „${load.textContent}“ geladen.`); });
+    const remove = document.createElement("button"); remove.type = "button"; remove.className = "preset-delete"; remove.textContent = "×"; remove.title = "Vorlage löschen"; remove.setAttribute("aria-label", "Vorlage löschen");
+    remove.addEventListener("click", () => { stored.splice(index, 1); localStorage.setItem("nat-rechner-presets", JSON.stringify(stored)); renderPresets(); });
+    item.append(load, remove); els.presetList.appendChild(item);
+  });
+}
+
+function setTransferStatus(message) { els.transferStatus.textContent = message; }
+
+function downloadJSON(data, filename) {
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+  link.download = filename; link.click(); URL.revokeObjectURL(link.href);
+}
+
+function importCSV(text) {
+  const [header, ...rows] = text.trim().split(/\r?\n/).filter(Boolean);
+  const columns = header.split(",").map(value => value.trim().toLowerCase());
+  const privateIndex = columns.indexOf("private_ip"); const publicIndex = columns.indexOf("public_ip");
+  if (privateIndex < 0 || publicIndex < 0) throw new Error("CSV benötigt die Spalten private_ip und public_ip.");
+  state.bulkRules = rows.map(row => row.split(",").map(value => value.trim())).filter(row => parseIPv4(row[privateIndex]) !== null && parseIPv4(row[publicIndex]) !== null)
+    .map(row => `ip nat inside source static ${row[privateIndex]} ${row[publicIndex]}`);
+  if (!state.bulkRules.length) throw new Error("CSV enthält keine gültigen 1:1-NAT-Zuordnungen.");
+  setTransferStatus(`${state.bulkRules.length} Bulk-Regeln importiert.`); calculate();
+}
+
+document.getElementById("save-preset").addEventListener("click", () => {
+  const name = prompt("Name der Vorlage:", `${modeLabels[state.mode]} ${els.insideNetwork.value.trim()}`)?.trim();
+  if (!name) return;
+  const stored = presets(); const data = snapshot(); data.name = name; stored.push(data);
+  localStorage.setItem("nat-rechner-presets", JSON.stringify(stored)); renderPresets(); setTransferStatus(`Vorlage „${name}“ gespeichert.`);
+});
+document.getElementById("export-data").addEventListener("click", () => { downloadJSON({ version: 1, exportedAt: new Date().toISOString(), current: snapshot(), presets: presets() }, "nat-rechner-export.json"); setTransferStatus("NAT-Planung als JSON exportiert."); });
+els.vendorProfile.addEventListener("change", () => { state.vendor = els.vendorProfile.value; calculate(); });
+els.importData.addEventListener("change", async event => {
+  const file = event.target.files?.[0]; if (!file) return;
+  try {
+    const text = await file.text();
+    if (file.name.toLowerCase().endsWith(".csv")) importCSV(text);
+    else {
+      const data = JSON.parse(text); const imported = data.current || data;
+      applySnapshot(imported);
+      if (Array.isArray(data.presets)) { localStorage.setItem("nat-rechner-presets", JSON.stringify(data.presets)); renderPresets(); }
+      setTransferStatus("NAT-Planung aus JSON importiert.");
+    }
+  } catch (error) { setTransferStatus(error.message || "Import fehlgeschlagen."); }
+  event.target.value = "";
+});
+renderPresets();
