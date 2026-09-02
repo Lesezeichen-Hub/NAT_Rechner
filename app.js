@@ -1,4 +1,4 @@
-const state = { mode: "pat" };
+const state = { mode: "pat", theme: localStorage.getItem("nat-rechner-theme") || "light" };
 
 const els = {
   form: document.getElementById("nat-form"),
@@ -29,6 +29,7 @@ const els = {
   capacityDetail: document.getElementById("capacity-detail"),
   configTitle: document.getElementById("config-title"),
   configOutput: document.getElementById("config-output"),
+  themeToggle: document.getElementById("theme-toggle"),
 };
 
 const modeLabels = { pat: "Port Address Translation", static: "1:1 Address Translation", pool: "Dynamischer NAT-Pool" };
@@ -207,6 +208,17 @@ function setMode(mode) {
   calculate();
 }
 
+function applyTheme(theme) {
+  state.theme = theme;
+  document.documentElement.dataset.theme = theme === "dark" ? "dark" : "";
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#111a21" : "#edf1f0");
+  const darkMode = theme === "dark";
+  els.themeToggle.textContent = darkMode ? "☀" : "◐";
+  els.themeToggle.title = darkMode ? "Light Mode aktivieren" : "Dark Mode aktivieren";
+  els.themeToggle.setAttribute("aria-label", els.themeToggle.title);
+  els.themeToggle.setAttribute("aria-pressed", String(darkMode));
+}
+
 async function copyText(text, button) {
   try {
     await navigator.clipboard.writeText(text);
@@ -225,6 +237,12 @@ document.getElementById("add-forward").addEventListener("click", () => addForwar
 document.getElementById("copy-config").addEventListener("click", event => copyText(els.configOutput.textContent, event.currentTarget));
 document.getElementById("copy-summary").addEventListener("click", event => copyText(`NAT-Modus: ${modeLabels[state.mode]}\nInside-Netz: ${els.insideNetwork.value}\nInside Global: ${els.publicIP.value}\nKapazitaet: ${els.capacityValue.textContent} ${els.capacityUnit.textContent}\n${els.capacityDetail.textContent}`, event.currentTarget));
 document.getElementById("reset").addEventListener("click", () => { els.form.reset(); els.forwardingList.innerHTML = ""; addForwarding({ protocol: "TCP", publicPort: 443, privateIP: "10.20.30.25", privatePort: 443 }); setMode("pat"); });
+els.themeToggle.addEventListener("click", () => {
+  const nextTheme = state.theme === "dark" ? "light" : "dark";
+  localStorage.setItem("nat-rechner-theme", nextTheme);
+  applyTheme(nextTheme);
+});
 
+applyTheme(state.theme);
 addForwarding({ protocol: "TCP", publicPort: 443, privateIP: "10.20.30.25", privatePort: 443 });
 calculate();
