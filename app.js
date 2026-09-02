@@ -9,6 +9,7 @@ const els = {
   form: document.getElementById("nat-form"),
   modeButtons: [...document.querySelectorAll(".mode-button")],
   modeLabel: document.getElementById("mode-label"),
+  modeDescription: document.getElementById("mode-description"),
   staticFields: document.getElementById("static-fields"),
   poolFields: document.getElementById("pool-fields"),
   insideNetwork: document.getElementById("inside-network"),
@@ -67,6 +68,16 @@ const modeLabels = {
   twice: "Bidirektionales Twice NAT",
   nptv6: "IPv6 Prefix Translation",
   nat64: "IPv6 zu IPv4 Übersetzung",
+};
+
+const modeDescriptions = {
+  pat: "<strong>PAT</strong> steht für Port Address Translation: Viele interne Hosts teilen eine öffentliche IPv4-Adresse über unterschiedliche Ports.",
+  static: "<strong>Statisches NAT</strong> bildet eine private Adresse dauerhaft auf genau eine öffentliche Adresse ab ($1:1$).",
+  pool: "<strong>Dynamisches NAT</strong> vergibt bei Bedarf eine freie öffentliche Adresse aus einem definierten Adresspool.",
+  cgnat: "<strong>CGNAT</strong> steht für Carrier-Grade NAT: Provider teilen öffentliche IPv4-Adressen über feste Portblöcke zwischen vielen Abonnenten.",
+  twice: "<strong>Twice NAT</strong> übersetzt Quelle und Ziel in derselben Regel, etwa für überlappende Netze nach einer Firmenfusion.",
+  nptv6: "<strong>NPTv6</strong> steht für Network Prefix Translation für IPv6: Es ersetzt nur den IPv6-Präfix, nicht die Host-ID oder Ports.",
+  nat64: "<strong>NAT64</strong> ermöglicht IPv6-Clients den Zugriff auf IPv4-Ziele; <strong>DNS64</strong> erzeugt dafür passende IPv6-Antworten aus A-Records.",
 };
 
 function parseIPv4(value) {
@@ -294,6 +305,7 @@ function setMode(mode) {
     button.setAttribute("aria-pressed", String(active));
   });
   els.modeLabel.textContent = modeLabels[mode];
+  els.modeDescription.innerHTML = modeDescriptions[mode];
   els.staticFields.classList.toggle("hidden", mode !== "static");
   els.poolFields.classList.toggle("hidden", mode !== "pool");
   els.cgnatFields.classList.toggle("hidden", mode !== "cgnat");

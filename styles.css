@@ -64,6 +64,8 @@ h3 { margin-bottom: 0; font-size: 0.95rem; }
 .mode-button { border: 0; border-bottom: 3px solid transparent; padding: 11px 16px; background: transparent; color: var(--muted); font-weight: 700; font-size: 0.88rem; }
 .mode-button:hover { color: var(--ink); }
 .mode-button.active { color: var(--accent-dark); border-bottom-color: var(--accent); }
+.mode-description { min-height: 2.7em; max-width: 920px; margin: -10px 0 24px; color: var(--muted); font-size: 0.84rem; line-height: 1.45; }
+.mode-description strong { color: var(--ink); }
 
 .workspace { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(300px, 0.9fr); gap: 20px; }
 .results-column { display: grid; align-content: start; gap: 20px; }
