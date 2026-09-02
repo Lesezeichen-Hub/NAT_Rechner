@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#111a21" />
+  <title>NAT Rechner</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Netzwerk-Werkzeug</p>
+        <h1>NAT Rechner</h1>
+        <p class="subtitle">Adressumsetzung, Portweiterleitungen und NAT-Pool-Kapazitaet auf einen Blick.</p>
+      </div>
+      <button id="reset" class="icon-button" type="button" title="Eingaben zuruecksetzen" aria-label="Eingaben zuruecksetzen">↺</button>
+    </header>
+
+    <section class="mode-bar" aria-label="NAT-Modus">
+      <button class="mode-button active" type="button" data-mode="pat" aria-pressed="true">PAT / Overload</button>
+      <button class="mode-button" type="button" data-mode="static" aria-pressed="false">Statisches NAT</button>
+      <button class="mode-button" type="button" data-mode="pool" aria-pressed="false">Dynamischer Pool</button>
+    </section>
+
+    <div class="workspace">
+      <section class="panel calculator-panel" aria-labelledby="calculator-title">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label" id="mode-label">Port Address Translation</p>
+            <h2 id="calculator-title">NAT-Planung</h2>
+          </div>
+          <span id="validation-state" class="status-chip neutral">Bereit</span>
+        </div>
+
+        <form id="nat-form" novalidate>
+          <div class="form-grid">
+            <label>
+              Inside Local Netz
+              <input id="inside-network" name="inside-network" value="10.20.30.0/24" autocomplete="off" spellcheck="false" />
+              <small>IPv4-Netz im privaten Bereich</small>
+            </label>
+            <label>
+              Inside Global Adresse
+              <input id="public-ip" name="public-ip" value="203.0.113.10" autocomplete="off" spellcheck="false" />
+              <small>Oeffentliche Quelladresse</small>
+            </label>
+            <label>
+              Protokoll
+              <select id="protocol" name="protocol">
+                <option value="tcp">TCP</option>
+                <option value="udp">UDP</option>
+                <option value="both">TCP und UDP</option>
+                <option value="icmp">ICMP</option>
+              </select>
+              <small>Gilt fuer die Portweiterleitung</small>
+            </label>
+            <label>
+              Gleichzeitige Verbindungen
+              <input id="connections" name="connections" type="number" min="1" max="10000000" value="500" />
+              <small>Erwartete NAT-Translations</small>
+            </label>
+          </div>
+
+          <div id="static-fields" class="mode-fields hidden">
+            <div class="form-grid compact-grid">
+              <label>
+                Private Host-Adresse
+                <input id="private-host" value="10.20.30.25" autocomplete="off" spellcheck="false" />
+              </label>
+              <label>
+                Oeffentliche Host-Adresse
+                <input id="static-public-ip" value="203.0.113.25" autocomplete="off" spellcheck="false" />
+              </label>
+            </div>
+          </div>
+
+          <div id="pool-fields" class="mode-fields hidden">
+            <div class="form-grid compact-grid">
+              <label>
+                Erster Pool-Adresse
+                <input id="pool-start" value="203.0.113.32" autocomplete="off" spellcheck="false" />
+              </label>
+              <label>
+                Letzte Pool-Adresse
+                <input id="pool-end" value="203.0.113.63" autocomplete="off" spellcheck="false" />
+              </label>
+            </div>
+          </div>
+
+          <div class="forwarding-block">
+            <div class="forwarding-heading">
+              <div>
+                <p class="section-label">Optional</p>
+                <h3>Portweiterleitung</h3>
+              </div>
+              <button id="add-forward" class="text-button" type="button">+ Weiterleitung</button>
+            </div>
+            <div id="forwarding-list" class="forwarding-list"></div>
+          </div>
+
+          <div class="form-actions">
+            <button class="primary-button" type="submit">Berechnung aktualisieren</button>
+            <button id="copy-summary" class="secondary-button" type="button">Zusammenfassung kopieren</button>
+          </div>
+        </form>
+      </section>
+
+      <aside class="results-column" aria-live="polite">
+        <section class="panel result-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="section-label">Ergebnis</p>
+              <h2>Adressbereich</h2>
+            </div>
+            <span id="cidr-badge" class="cidr-badge">/24</span>
+          </div>
+          <dl class="result-list">
+            <div><dt>Netzadresse</dt><dd id="network-address">10.20.30.0</dd></div>
+            <div><dt>Broadcast</dt><dd id="broadcast-address">10.20.30.255</dd></div>
+            <div><dt>Nutzbare Hosts</dt><dd id="usable-hosts">254</dd></div>
+            <div><dt>Host-Bereich</dt><dd id="host-range">10.20.30.1 - 10.20.30.254</dd></div>
+          </dl>
+        </section>
+
+        <section class="panel result-panel capacity-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="section-label">Auslastung</p>
+              <h2 id="capacity-title">PAT-Kapazitaet</h2>
+            </div>
+          </div>
+          <div class="capacity-number"><span id="capacity-value">64.512</span><small id="capacity-unit">TCP/UDP-Ports</small></div>
+          <div class="meter" role="meter" aria-label="Kapazitaetsauslastung" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <span id="capacity-meter"></span>
+          </div>
+          <p id="capacity-detail" class="capacity-detail">500 erwartete Translations belegen weniger als 1 % einer einzelnen oeffentlichen Adresse.</p>
+        </section>
+      </aside>
+    </div>
+
+    <section class="panel config-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="section-label">Konfiguration</p>
+          <h2 id="config-title">Cisco IOS: PAT</h2>
+        </div>
+        <button id="copy-config" class="icon-button" type="button" title="Konfiguration kopieren" aria-label="Konfiguration kopieren">⧉</button>
+      </div>
+      <pre id="config-output" class="config-output"></pre>
+    </section>
+
+    <section class="reference-grid">
+      <article class="reference-card">
+        <p class="section-label">RFC 1918</p>
+        <h2>Private IPv4-Netze</h2>
+        <ul>
+          <li><code>10.0.0.0/8</code></li>
+          <li><code>172.16.0.0/12</code></li>
+          <li><code>192.168.0.0/16</code></li>
+        </ul>
+      </article>
+      <article class="reference-card">
+        <p class="section-label">Betriebshinweis</p>
+        <h2>Vor dem Rollout</h2>
+        <p>Route, ACL, Inside/Outside-Markierung und Port-Konflikte gegen die Zielplattform pruefen.</p>
+      </article>
+    </section>
+  </main>
+  <template id="forwarding-template">
+    <div class="forward-row">
+      <select class="forward-protocol" aria-label="Protokoll"><option>TCP</option><option>UDP</option></select>
+      <input class="forward-public-port" type="number" min="1" max="65535" placeholder="Public Port" aria-label="Oeffentlicher Port" />
+      <span>→</span>
+      <input class="forward-private-ip" placeholder="Inside Host" aria-label="Privater Host" />
+      <input class="forward-private-port" type="number" min="1" max="65535" placeholder="Inside Port" aria-label="Privater Port" />
+      <button class="remove-forward icon-button" type="button" title="Weiterleitung entfernen" aria-label="Weiterleitung entfernen">×</button>
+    </div>
+  </template>
+  <script src="app.js"></script>
+</body>
+</html>
