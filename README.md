@@ -2,6 +2,10 @@
 
 Ein lokaler, abhängigkeitsfreier Rechner für IPv4- und IPv6-NAT-Planung. Das Tool hilft bei der Auslegung von NAT-Regeln, prüft typische Adresskonflikte und erzeugt Konfigurationsvorlagen für mehrere Plattformen.
 
+![NAT Rechner mit PAT-Planung, Validierung, Konfigurationsausgabe und Paketfluss](docs/images/nat-rechner-overview.png)
+
+*PAT-Planung mit Echtzeit-Validierung, Cisco-IOS-Vorlage und visualisiertem Paketfluss.*
+
 ## Funktionen
 
 - CIDR-Auswertung für IPv4-Netze mit Netzadresse, Broadcast, Hostbereich und nutzbaren Hosts
