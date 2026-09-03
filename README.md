@@ -71,6 +71,12 @@ Gültige CSV-Zeilen erscheinen als zusätzliche Cisco-IOS-Bulk-Regeln in der Kon
 
 Da alle Dateien relativ eingebunden sind, funktioniert das Modul sowohl direkt aus dem Dateisystem als auch innerhalb des Lesezeichen-Hubs.
 
+## Versionierung
+
+Die aktuelle Modulversion steht in `version.json`. Der Lesezeichen-Hub liest diese Datei direkt über `raw.githubusercontent.com`; dafür wird keine GitHub-REST-API-Abfrage und kein API-Kontingent benötigt.
+
+Die festgelegte Ausgangsversion ist `1.0.0`. Beim Veröffentlichen eines GitHub-Releases aktualisiert `.github/workflows/publish-version.yml` das Manifest auf `main`. Dadurch kann der Hub die installierte Modulversion speichern und spätere Updates anzeigen.
+
 ## Dateien
 
 - [index.html](index.html): Struktur und Bedienoberfläche
