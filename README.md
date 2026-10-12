@@ -15,6 +15,7 @@ Ein lokaler, abhängigkeitsfreier Rechner für IPv4- und IPv6-NAT-Planung. Das T
 - CGNAT mit RFC-6598-Validierung, Portblock-Größe und Abonnentenkapazität
 - Twice NAT für gleichzeitige Quell- und Zielübersetzung bei überlappenden Netzen
 - NPTv6 für IPv6-Präfixübersetzung sowie NAT64/DNS64 mit $/96$-Präfixprüfung
+- Zusätzlicher Tab **Arbeits Netz** für die Umrechnung von Raw-IP-Adressen in die zugeordneten NAT-Netze (13 WAB-Netze, `/26` und `/28`)
 - Beliebig viele TCP- und UDP-Portweiterleitungen
 - Echtzeit-Validierung von IPv4-/IPv6-Adressen, CIDR-Präfixen, Portnummern und doppelten Weiterleitungen
 - Warnungen für RFC-1918-/RFC-6598-Verstöße, Loopback, Multicast, Dokumentationsnetze, Pool- und Netzüberlappungen sowie Port-Erschöpfung
@@ -35,6 +36,8 @@ Die Anwendung besteht nur aus statischen Dateien und benötigt weder einen Build
 3. Den NAT-Modus auswählen und bei Bedarf Pool- oder statische Zuordnung eintragen.
 4. Optionale Portweiterleitungen hinzufügen.
 5. Die berechnete Zusammenfassung oder IOS-Konfiguration kopieren und vor dem Einsatz Interfaces, Routing und Firewall-Regeln an die Zielumgebung anpassen.
+
+Im Tab **Arbeits Netz** ein WAB-Netz auswählen und eine IPv4-Adresse aus dem angezeigten Quellnetz eingeben. Die NAT-Adresse wird durch Beibehaltung des Host-Offsets berechnet; Adressen außerhalb des vollständigen Quell-CIDR werden abgewiesen.
 
 ## NAT-Modi
 

@@ -80,6 +80,22 @@ const modeDescriptions = {
   nat64: "<strong>NAT64</strong> ermöglicht IPv6-Clients den Zugriff auf IPv4-Ziele; <strong>DNS64</strong> erzeugt dafür passende IPv6-Antworten aus A-Records.",
 };
 
+const workNetworkMappings = [
+  { name: "wab-live-front", source: "10.192.0.0/26", target: "172.29.79.64/26" },
+  { name: "wab-live-app", source: "10.192.64.0/26", target: "172.29.67.128/26" },
+  { name: "wab-live-db", source: "10.192.128.0/26", target: "172.29.76.128/26" },
+  { name: "wab-int-front", source: "10.194.0.0/26", target: "172.29.66.64/26" },
+  { name: "wab-int-app", source: "10.194.64.0/26", target: "172.29.71.64/26" },
+  { name: "wab-int-db", source: "10.194.128.0/26", target: "172.29.65.192/26" },
+  { name: "wab-int2-front", source: "10.195.0.0/26", target: "172.29.77.64/26" },
+  { name: "wab-int2-app", source: "10.195.64.0/26", target: "172.29.77.0/26" },
+  { name: "wab-int2-db", source: "10.195.128.0/26", target: "172.29.76.192/26" },
+  { name: "wab-mgmt-cd", source: "10.195.240.0/28", target: "172.29.2.224/28" },
+  { name: "wab-aws-3", source: "10.158.66.64/26", target: "172.29.67.192/26" },
+  { name: "wab-aws-1", source: "10.158.66.128/26", target: "172.29.79.0/26" },
+  { name: "wab-aws-2", source: "10.158.66.192/26", target: "172.29.53.128/26" },
+];
+
 function parseIPv4(value) {
   const parts = String(value).trim().split(".");
   if (parts.length !== 4 || parts.some(part => !/^\d+$/.test(part) || Number(part) > 255)) return null;
@@ -341,6 +357,56 @@ function setMode(mode) {
   els.nat64Fields.classList.toggle("hidden", mode !== "nat64");
   calculate();
 }
+
+function calculateWorkNetwork() {
+  const networkName = document.getElementById("work-network-select").value;
+  const input = document.getElementById("work-network-ip").value.trim();
+  const error = document.getElementById("work-network-error");
+  const result = document.getElementById("work-network-result");
+  const mapping = workNetworkMappings.find(item => item.name === networkName);
+
+  error.hidden = true;
+  result.hidden = true;
+  if (!networkName && !input) return;
+  if (!mapping) {
+    error.textContent = "Bitte zuerst ein Arbeitsnetz auswählen.";
+    error.hidden = false;
+    return;
+  }
+  if (!input) return;
+
+  const rawIP = parseIPv4(input);
+  const source = parseCIDR(mapping.source);
+  const target = parseCIDR(mapping.target);
+  if (rawIP === null) {
+    error.textContent = "Bitte eine gültige IPv4-Adresse mit vier Oktetten (je 0–255) eingeben.";
+    error.hidden = false;
+    return;
+  }
+  if (!source || !target || source.prefix !== target.prefix || rawIP < source.network || rawIP > source.broadcast) {
+    error.textContent = `Die IP-Adresse liegt nicht im Quellnetz ${mapping.source}.`;
+    error.hidden = false;
+    return;
+  }
+
+  const translatedIP = target.network + (rawIP - source.network);
+  document.getElementById("work-network-result-ip").textContent = formatIPv4(translatedIP);
+  document.getElementById("work-network-result-name").textContent = `${mapping.name}: ${mapping.source} → ${mapping.target}`;
+  result.hidden = false;
+}
+
+document.querySelectorAll(".view-tab").forEach(button => button.addEventListener("click", () => {
+  const selectedView = button.dataset.view;
+  document.querySelectorAll(".view-tab").forEach(tab => {
+    const active = tab === button;
+    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-selected", String(active));
+  });
+  document.getElementById("nat-calculator-view").hidden = selectedView !== "nat-calculator-view";
+  document.getElementById("work-network-view").hidden = selectedView !== "work-network-view";
+}));
+document.getElementById("work-network-select").addEventListener("change", calculateWorkNetwork);
+document.getElementById("work-network-ip").addEventListener("input", calculateWorkNetwork);
 
 function applyTheme(theme) {
   state.theme = theme;

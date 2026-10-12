@@ -21,6 +21,12 @@
       </div>
     </header>
 
+    <nav class="view-tabs" aria-label="Werkzeug auswählen">
+      <button class="view-tab active" type="button" data-view="nat-calculator-view" aria-selected="true">NAT-Rechner</button>
+      <button class="view-tab" type="button" data-view="work-network-view" aria-selected="false">Arbeits Netz</button>
+    </nav>
+
+    <div id="nat-calculator-view">
     <section class="mode-bar" aria-label="NAT-Modus">
       <button class="mode-button active" type="button" data-mode="pat" aria-pressed="true">PAT / Overload</button>
       <button class="mode-button" type="button" data-mode="static" aria-pressed="false">Statisches NAT</button>
@@ -277,6 +283,50 @@
         <h2>Vor dem Rollout</h2>
         <p>Route, ACL, Inside/Outside-Markierung und Port-Konflikte gegen die Zielplattform prüfen.</p>
       </article>
+    </section>
+    </div>
+
+    <section id="work-network-view" class="panel work-network-panel" aria-labelledby="work-network-title" hidden>
+      <div class="panel-heading">
+        <div>
+          <p class="section-label">Statische Netzwerkzuordnung</p>
+          <h2 id="work-network-title">Arbeits Netz – NAT-IP berechnen</h2>
+        </div>
+        <span class="cidr-badge">IPv4</span>
+      </div>
+      <p class="work-network-intro">Wähle ein Arbeitsnetz und gib eine IP-Adresse aus dem Quellnetz ein. Die Host-Adresse wird mit demselben Offset in das zugehörige NAT-Netz übertragen.</p>
+      <div class="work-network-form">
+        <label for="work-network-select">Netzwerk auswählen
+          <select id="work-network-select">
+            <option value="">-- Bitte wählen --</option>
+            <option value="wab-live-front">wab-live-front (10.192.0.0/26 → 172.29.79.64/26)</option>
+            <option value="wab-live-app">wab-live-app (10.192.64.0/26 → 172.29.67.128/26)</option>
+            <option value="wab-live-db">wab-live-db (10.192.128.0/26 → 172.29.76.128/26)</option>
+            <option value="wab-int-front">wab-int-front (10.194.0.0/26 → 172.29.66.64/26)</option>
+            <option value="wab-int-app">wab-int-app (10.194.64.0/26 → 172.29.71.64/26)</option>
+            <option value="wab-int-db">wab-int-db (10.194.128.0/26 → 172.29.65.192/26)</option>
+            <option value="wab-int2-front">wab-int2-front (10.195.0.0/26 → 172.29.77.64/26)</option>
+            <option value="wab-int2-app">wab-int2-app (10.195.64.0/26 → 172.29.77.0/26)</option>
+            <option value="wab-int2-db">wab-int2-db (10.195.128.0/26 → 172.29.76.192/26)</option>
+            <option value="wab-mgmt-cd">wab-mgmt-cd (10.195.240.0/28 → 172.29.2.224/28)</option>
+            <option value="wab-aws-3">wab-aws-3 (10.158.66.64/26 → 172.29.67.192/26)</option>
+            <option value="wab-aws-1">wab-aws-1 (10.158.66.128/26 → 172.29.79.0/26)</option>
+            <option value="wab-aws-2">wab-aws-2 (10.158.66.192/26 → 172.29.53.128/26)</option>
+          </select>
+        </label>
+        <label for="work-network-ip">Raw-IP-Adresse
+          <input id="work-network-ip" type="text" placeholder="z. B. 10.192.0.10" autocomplete="off" spellcheck="false" inputmode="decimal" aria-describedby="work-network-error" />
+          <small>Die vollständige IPv4-Adresse muss im ausgewählten Quellnetz liegen.</small>
+        </label>
+      </div>
+      <p id="work-network-error" class="work-network-error" role="alert" hidden></p>
+      <div id="work-network-result" class="work-network-result" aria-live="polite" hidden>
+        <div>
+          <p class="result-label">Zugehörige NAT-IP</p>
+          <p id="work-network-result-ip" class="result-ip"></p>
+        </div>
+        <span id="work-network-result-name" class="work-network-result-name"></span>
+      </div>
     </section>
   </main>
   <template id="forwarding-template">
