@@ -81,19 +81,19 @@ const modeDescriptions = {
 };
 
 const workNetworkMappings = [
-  { name: "wab-live-front", source: "10.192.0.0/26", target: "172.29.79.64/26" },
-  { name: "wab-live-app", source: "10.192.64.0/26", target: "172.29.67.128/26" },
-  { name: "wab-live-db", source: "10.192.128.0/26", target: "172.29.76.128/26" },
-  { name: "wab-int-front", source: "10.194.0.0/26", target: "172.29.66.64/26" },
-  { name: "wab-int-app", source: "10.194.64.0/26", target: "172.29.71.64/26" },
-  { name: "wab-int-db", source: "10.194.128.0/26", target: "172.29.65.192/26" },
-  { name: "wab-int2-front", source: "10.195.0.0/26", target: "172.29.77.64/26" },
-  { name: "wab-int2-app", source: "10.195.64.0/26", target: "172.29.77.0/26" },
-  { name: "wab-int2-db", source: "10.195.128.0/26", target: "172.29.76.192/26" },
-  { name: "wab-mgmt-cd", source: "10.195.240.0/28", target: "172.29.2.224/28" },
-  { name: "wab-aws-3", source: "10.158.66.64/26", target: "172.29.67.192/26" },
-  { name: "wab-aws-1", source: "10.158.66.128/26", target: "172.29.79.0/26" },
-  { name: "wab-aws-2", source: "10.158.66.192/26", target: "172.29.53.128/26" },
+  { name: "wab-live-front", source: "10.192.0.0/26", sourceBaseOctet: 0, target: "172.29.79.64/26" },
+  { name: "wab-live-app", source: "10.192.64.0/26", sourceBaseOctet: 64, target: "172.29.67.128/26" },
+  { name: "wab-live-db", source: "10.192.128.0/26", sourceBaseOctet: 128, target: "172.29.76.128/26" },
+  { name: "wab-int-front", source: "10.194.0.0/26", sourceBaseOctet: 0, target: "172.29.66.64/26" },
+  { name: "wab-int-app", source: "10.194.64.0/26", sourceBaseOctet: 64, target: "172.29.71.64/26" },
+  { name: "wab-int-db", source: "10.194.128.0/26", sourceBaseOctet: 128, target: "172.29.65.192/26" },
+  { name: "wab-int2-front", source: "10.195.0.0/26", sourceBaseOctet: 0, target: "172.29.77.64/26" },
+  { name: "wab-int2-app", source: "10.195.64.0/26", sourceBaseOctet: 64, target: "172.29.77.0/26" },
+  { name: "wab-int2-db", source: "10.195.128.0/26", sourceBaseOctet: 128, target: "172.29.76.192/26" },
+  { name: "wab-mgmt-cd", source: "10.195.240.0/28", sourceBaseOctet: 240, target: "172.29.2.224/28" },
+  { name: "wab-aws-3", source: "10.158.66.64/26", sourceBaseOctet: 64, target: "172.29.67.192/26" },
+  { name: "wab-aws-1", source: "10.158.66.128/26", sourceBaseOctet: 128, target: "172.29.79.0/26" },
+  { name: "wab-aws-2", source: "10.158.66.192/26", sourceBaseOctet: 192, target: "172.29.53.128/26" },
 ];
 
 function parseIPv4(value) {
@@ -376,20 +376,22 @@ function calculateWorkNetwork() {
   if (!input) return;
 
   const rawIP = parseIPv4(input);
-  const source = parseCIDR(mapping.source);
   const target = parseCIDR(mapping.target);
   if (rawIP === null) {
     error.textContent = "Bitte eine gültige IPv4-Adresse mit vier Oktetten (je 0–255) eingeben.";
     error.hidden = false;
     return;
   }
-  if (!source || !target || source.prefix !== target.prefix || rawIP < source.network || rawIP > source.broadcast) {
-    error.textContent = `Die IP-Adresse liegt nicht im Quellnetz ${mapping.source}.`;
+  const rawLastOctet = rawIP & 255;
+  const offset = rawLastOctet - mapping.sourceBaseOctet;
+  const maxOffset = target ? Math.min(63, 255 - mapping.sourceBaseOctet, target.broadcast - target.network) : -1;
+  if (!target || offset < 0 || offset > maxOffset) {
+    error.textContent = `Der Offset zum Quell-Basisoktett ${mapping.sourceBaseOctet} muss zwischen 0 und ${maxOffset} liegen.`;
     error.hidden = false;
     return;
   }
 
-  const translatedIP = target.network + (rawIP - source.network);
+  const translatedIP = target.network + offset;
   document.getElementById("work-network-result-ip").textContent = formatIPv4(translatedIP);
   document.getElementById("work-network-result-name").textContent = `${mapping.name}: ${mapping.source} → ${mapping.target}`;
   result.hidden = false;

@@ -294,7 +294,7 @@
         </div>
         <span class="cidr-badge">IPv4</span>
       </div>
-      <p class="work-network-intro">Wähle ein Arbeitsnetz und gib eine IP-Adresse aus dem Quellnetz ein. Die Host-Adresse wird mit demselben Offset in das zugehörige NAT-Netz übertragen.</p>
+      <p class="work-network-intro">Wähle ein Arbeitsnetz und gib eine gültige Raw-IP-Adresse ein. Wie in der Vorlage wird das letzte Oktett relativ zum hinterlegten Quell-Basisoktett auf das NAT-Netz übertragen; die ersten drei Oktette der Raw-IP sind dabei unerheblich.</p>
       <div class="work-network-form">
         <label for="work-network-select">Netzwerk auswählen
           <select id="work-network-select">
@@ -316,7 +316,7 @@
         </label>
         <label for="work-network-ip">Raw-IP-Adresse
           <input id="work-network-ip" type="text" placeholder="z. B. 10.192.0.10" autocomplete="off" spellcheck="false" inputmode="decimal" aria-describedby="work-network-error" />
-          <small>Die vollständige IPv4-Adresse muss im ausgewählten Quellnetz liegen.</small>
+          <small>Das letzte Oktett muss innerhalb des ausgewählten Quellnetz-Bereichs liegen.</small>
         </label>
       </div>
       <p id="work-network-error" class="work-network-error" role="alert" hidden></p>

@@ -37,7 +37,7 @@ Die Anwendung besteht nur aus statischen Dateien und benötigt weder einen Build
 4. Optionale Portweiterleitungen hinzufügen.
 5. Die berechnete Zusammenfassung oder IOS-Konfiguration kopieren und vor dem Einsatz Interfaces, Routing und Firewall-Regeln an die Zielumgebung anpassen.
 
-Im Tab **Arbeits Netz** ein WAB-Netz auswählen und eine IPv4-Adresse aus dem angezeigten Quellnetz eingeben. Die NAT-Adresse wird durch Beibehaltung des Host-Offsets berechnet; Adressen außerhalb des vollständigen Quell-CIDR werden abgewiesen.
+Im Tab **Arbeits Netz** ein WAB-Netz auswählen und eine gültige Raw-IPv4-Adresse eingeben. Wie in der ursprünglichen Vorlage wird nur das letzte Oktett ausgewertet: Sein Offset zum hinterlegten Quell-Basisoktett wird auf das NAT-Netz übertragen. Die ersten drei Oktette der Raw-IP müssen daher nicht mit dem Quellnetz übereinstimmen; der Offset muss in den verfügbaren Zielbereich passen.
 
 ## NAT-Modi
 
